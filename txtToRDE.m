@@ -65,15 +65,15 @@ for i = 1:totalSteps
 
     % Plot, and set 'DisplayName' for the legend
     plot(voltage, current, ...
-         'DisplayName', sprintf('RPM = %.2f', rpm_avg));
+         'DisplayName', sprintf('RPM = %.0f', rpm_avg));
 end
 
 % Automatically create legend from 'DisplayName' properties
 legend show;
 
 hold off;
-xlabel('Voltage');
-ylabel('Current');
+xlabel('Voltage (V)');
+ylabel('Current (A)');
 title('CV Curves in Rotating Disk Electrode for various RPMs');
 grid on;
 
@@ -184,7 +184,9 @@ for vIndex = 1:length(voltagesToAnalyze)
     yFit = polyval(p, xFit);
 
     % === Plot the fit line ===
-    plot(xFit, yFit, '--', 'Color', colors(vIndex,:));
+    plot(xFit, yFit, '--', ...
+        'Color', colors(vIndex,:), ...
+        'HandleVisibility','off');  % <-- This hides the line from the legend
 end
 
 legend('Location','best');
@@ -264,3 +266,38 @@ xlabel('Voltage (mV)');
 ylabel('Diffusion Coefficient (cm^2/s)');
 title('Comparison of Diffusion Coefficients (n = 2 vs. n = 4)');
 legend('Location','best');
+
+
+
+
+% --- 1) Kinetic current from intercept ---
+I_k_values = 1 ./ intercepts;   % [A]
+
+% --- 2) Convert mV -> V (adjust if you have a reference offset) ---
+E = voltagesToAnalyze / 1000;   % [V]
+
+% --- 3) Tafel plot: E vs. log10(I_k) ---
+figure; hold on; grid on;
+logIk = log10(abs(I_k_values));
+plot(logIk, E, 'o','DisplayName','Kinetic Data');
+
+% Fit a subset or all the points
+idxFit = 1:length(logIk);
+pTafel = polyfit(logIk(idxFit), E(idxFit), 1);
+E_fit  = polyval(pTafel, logIk(idxFit));
+
+plot(logIk(idxFit), E_fit, '--','DisplayName','Linear Fit');
+xlabel('log_{10}(I_k) [A]');
+ylabel('E (V vs Ag/AgCl;)');  % specify your reference
+title('Tafel Plot');
+legend('Location','best');
+
+% --- 4) Slope in V/dec ---
+slope_Vdec = pTafel(1);
+% Convert slope to mV/dec
+slope_mVdec = slope_Vdec * 1000;
+
+% Display in Command Window
+disp('================ Tafel Analysis ================');
+disp(['Tafel slope: ', num2str(slope_mVdec, '%.2f'), ' mV/dec']);
+disp('================================================');
