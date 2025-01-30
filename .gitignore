@@ -22,3 +22,4 @@ octave-workspace
 .autosave
 # data files to be analyzed
 *.txt
+*.mpr
