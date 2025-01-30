@@ -276,7 +276,7 @@ function paramStruct = localParseTechniqueParams(moduleData, techniqueName, modH
 
 
 
-    fprintf('Chosen ns_offset=0x%X: ns=%d\n', ns_offset, ns);
+    %fprintf('Chosen ns_offset=0x%X: ns=%d\n', ns_offset, ns);
 
     % `n_params` is always **2 bytes after** `ns`
     np_offset = ns_offset + 2;
@@ -382,16 +382,15 @@ function n = localByteSize(dtypeStr)
 end
 
 
-
-
 function out = parseVMPData(moduleData, modHeader)
-%PARSEVMPDATA - Parses "VMP data" from Biologic MPR files.
+%PARSEVMPDATA - Parses "VMP data" from Biologic MPR files row-by-row.
 
     out = struct();
     out.DataPoints  = [];
     out.Columns     = {};
     out.ColumnIDs   = [];
 
+    % Step 1: Read header info
     offset = 1;
     nDataPoints = typecast(moduleData(offset + (0:3)), 'uint32');
     nColumns    = double(moduleData(offset + 4));
@@ -401,6 +400,7 @@ function out = parseVMPData(moduleData, modHeader)
         return;
     end
 
+    % Step 2: Extract column IDs
     colIDStart = offset + 5;
     colIDEnd = colIDStart + (2 * nColumns) - 1;
 
@@ -413,9 +413,12 @@ function out = parseVMPData(moduleData, modHeader)
     columnIDs = typecast(columnIDBytes, 'uint16');
     out.ColumnIDs = columnIDs;
 
+    % Step 3: Get column names, data types, and bytes per column
     [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(columnIDs);
+
     bytesPerRow = sum(bytesPerCol);
 
+    % Step 4: Determine data start offset
     if modHeader.oldver == 3
         dataStart = hex2dec('196');
     elseif modHeader.oldver == 2
@@ -426,6 +429,9 @@ function out = parseVMPData(moduleData, modHeader)
         dataStart = hex2dec('195');
     end
 
+    dataStart = hex2dec('197'); %hardcoded value!! uh oh!
+
+    fprintf("Data offset: 0x%x\n", dataStart)
     bytesNeeded = nDataPoints * bytesPerRow;
     dataEnd = dataStart + bytesNeeded - 1;
 
@@ -437,39 +443,66 @@ function out = parseVMPData(moduleData, modHeader)
         return;
     end
 
-    rawData = moduleData(dataStart : dataStart + nDataPoints * bytesPerRow - 1);
-    dataMatrix = zeros(nDataPoints, numel(columnNames));
-    offset = 1;
+    % Step 5: Allocate Data Matrix
+    dataMatrix = zeros(nDataPoints, nColumns);
+
+    % Step 6: Read data row-by-row
+    for rowIdx = 1:nDataPoints
+        rowStart = dataStart + (rowIdx - 1) * bytesPerRow;
+        rowBytes = moduleData(rowStart : rowStart + bytesPerRow - 1);
+        nColumnsToIterate = numel(bytesPerCol);  % ✅ Corrected this line
     
-    for colIdx = 1:numel(columnNames)
-        colType = dataTypes{colIdx};
-        numBytes = bytesPerCol(colIdx);
-        rawColData = rawData(offset:offset + numBytes * nDataPoints - 1);
-        
-        switch colType
-            case 'single'
-                colData = typecast(rawColData, 'single');
-            case 'uint8'
-                colData = typecast(rawColData, 'uint8');
-            case 'uint16'
-                colData = typecast(rawColData, 'uint16');
-            case 'int16'
-                colData = typecast(rawColData, 'int16');
-            case 'uint32'
-                colData = typecast(rawColData, 'uint32');
-            case 'int32'
-                colData = typecast(rawColData, 'int32');
-            case 'double'
-                colData = typecast(rawColData, 'double');
-            otherwise
-                colData = nan(nDataPoints, 1);
+        % Process each column in the row
+        rowOffset = 1;
+        for colIdx = 1:nColumnsToIterate
+            colType = dataTypes{colIdx};
+            numBytes = bytesPerCol(colIdx);
+            colBytes = rowBytes(rowOffset:rowOffset + numBytes - 1);
+    
+            % Only print debugging info for first 10 rows
+            % if rowIdx <= 10
+            %     fprintf("Row %d, Column %d (%s, %d bytes): %s\n", rowIdx, colIdx, colType, numBytes, mat2str(colBytes));
+            % end
+    
+            % Convert based on type
+            switch colType
+                case 'single'
+                    colData = typecast(uint8(colBytes), 'single');
+                case 'uint8'
+                    colData = typecast(uint8(colBytes), 'uint8');
+                case 'uint16'
+                    colData = typecast(uint8(colBytes), 'uint16');
+                case 'int16'
+                    colData = typecast(uint8(colBytes), 'int16');
+                case 'uint32'
+                    colData = typecast(uint8(colBytes), 'uint32');
+                case 'int32'
+                    colData = typecast(uint8(colBytes), 'int32');
+                case 'double'
+                    colData = typecast(uint8(colBytes), 'double');
+                otherwise
+                    warning("[parseVMPData] Unknown type for column %d: %s", colIdx, colType);
+                    colData = nan;
+            end
+    
+            % Store value in matrix
+            dataMatrix(rowIdx, colIdx) = colData;
+    
+            % Advance row offset
+            rowOffset = rowOffset + numBytes;
         end
-        
-        dataMatrix(:, colIdx) = colData;
-        offset = offset + numBytes * nDataPoints;
+    
+        % Only print row summary for first 10 rows
+        % if rowIdx <= 10
+        %     fprintf("Row %d Extracted Data: %s\n", rowIdx, mat2str(dataMatrix(rowIdx, :)));
+        % elseif rowIdx == 11
+        %     fprintf("\n=== Debugging output limited to first 10 rows ===\n");
+        % end
     end
 
-    % If there is a flag column, unpack it properly
+
+
+    % Step 7: Handle Flags if present
     if isfield(flagInfo, 'Flags')
         flagIdx = find(strcmp(columnNames, 'Flags'));
         flagData = dataMatrix(:, flagIdx);
@@ -480,16 +513,17 @@ function out = parseVMPData(moduleData, modHeader)
             bitmask = flagInfo.Flags.(flagNames{i}).bitmask;
             unpackedFlags(:, i) = bitand(flagData, bitmask) > 0;
         end
-        
-        % Insert unpacked flag columns in place of "Flags"
+
+        % Insert unpacked flag columns
         dataMatrix = [dataMatrix(:, 1:flagIdx-1), unpackedFlags, dataMatrix(:, flagIdx+1:end)];
         columnNames = [columnNames(1:flagIdx-1), flagNames', columnNames(flagIdx+1:end)];
     end
 
+    fprintf("Processed %d rows of data\n", nDataPoints)
+    % Step 8: Store final parsed data
     out.DataPoints = dataMatrix;
     out.Columns = columnNames;
 end
-
 
 
 
@@ -502,17 +536,21 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
     data_columns = containers.Map('KeyType', 'double', 'ValueType', 'any');
     flag_columns = containers.Map('KeyType', 'double', 'ValueType', 'any');
 
-    % Define normal columns
-    data_columns(4)   = {'double', 'time', 64};  
-    data_columns(5)   = {'single', 'control_V_I', 32};  
-    data_columns(6)   = {'single', 'Ewe', 32}; 
-    data_columns(7)   = {'double', 'dq', 64};
-    data_columns(13)  = {'double', '(Q-Qo)', 64};
-    data_columns(19)  = {'single', 'control_V', 32};
-    data_columns(39)  = {'uint16', 'I_Range', 16};  
-    data_columns(467) = {'double', 'Q_charge_or_discharge', 64};
+    % Define standard columns
+    data_columns(4)   = {'double', 'time', 8};  
+    data_columns(5)   = {'single', 'control_V_I', 4};  
+    data_columns(6)   = {'single', 'Ewe', 4}; 
+    data_columns(7)   = {'double', 'dq', 8};
+    data_columns(13)  = {'double', '(Q-Qo)', 8};
+    data_columns(19)  = {'single', 'control_V', 4};
+    data_columns(20)  = {'single', 'control_I', 4}; % ✅ Added control_I
+    data_columns(24)  = {'uint8', 'Ns', 1}; % ✅ Added Ns
+    data_columns(39)  = {'uint16', 'I_Range', 2};
+    data_columns(131) = {'uint16', 'Ns', 2};   % ✅ Ensure Ns is 2 bytes
+    data_columns(467) = {'double', 'Q_charge_or_discharge', 8};
+    data_columns(468) = {'uint32', 'half cycle', 4}; % ✅ Ensure half cycle is 4 bytes
 
-    % Define flag bitmask columns
+    % Define flag bitmask columns (these should be combined into a single Flags byte)
     flag_columns(1)  = {3, 'mode', 2};  
     flag_columns(2)  = {4, 'ox_or_red', 1};  
     flag_columns(3)  = {8, 'error', 1};  
@@ -520,40 +558,59 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
     flag_columns(31) = {32, 'Ns_changes', 1};  
     flag_columns(65) = {128, 'counter_inc', 1};  
 
-    columnNames = {}; dataTypes = {}; bytesPerCol = [];
+    columnNames = {}; 
+    dataTypes = {}; 
+    bytesPerCol = [];
     flagInfo = struct();
-
     haveFlagsColumn = false;
+
+    %fprintf("\n=== Debugging lookupColumnTypes ===\n");
+    %fprintf("Detected columnIDs: %s\n", mat2str(columnIDs));
 
     for i = 1:numel(columnIDs)
         colID = columnIDs(i);
+        
         if ismember(colID, FLAGS_GROUP)
+            %fprintf("[Flag Detected] ID: %d (Adding to Flags Byte)\n", colID);
+            
             if ~haveFlagsColumn
                 haveFlagsColumn = true;
                 columnNames{end+1} = 'Flags';
                 dataTypes{end+1} = 'uint8';
-                bytesPerCol(end+1) = 1;  % 1 byte for the entire Flags column
+                bytesPerCol(end+1) = 1;
                 flagInfo.Flags = struct();
+                %fprintf("  -> Flags column initialized (1 byte)\n");
             end
-            % Extract the flag column information first
+    
             flagData = flag_columns(colID);
             bitmask = flagData{1};
             flagName = flagData{2};
-            numBits = flagData{3};
-
-            % Assign to flagInfo struct safely
-            flagInfo.Flags.(flagName) = struct('bitmask', bitmask, 'numBits', numBits);
-            
+            flagInfo.Flags.(flagName) = struct('bitmask', bitmask);
+            %fprintf("  -> Flag '%s' (bitmask: %d) added to Flags Byte.\n", flagName, bitmask);
+    
         elseif isKey(data_columns, colID)
             val = data_columns(colID);
             columnNames{end+1} = val{2};
             dataTypes{end+1} = val{1};
-            bytesPerCol(end+1) = val{3} / 8;
+            bytesPerCol(end+1) = val{3};
+    
+            %fprintf("[Column Added] ID: %d -> Name: %s, Type: %s, Bytes: %d\n", ...
+            %        colID, val{2}, val{1}, val{3});
+        else
+            warning('Unknown column ID', colID)
+            fprintf("[Warning] Unknown column ID: %d\n", colID);
         end
     end
+
+    % Final Debugging Output
+    %fprintf("\n=== Final Byte Calculation ===\n");
+    %fprintf("Columns Detected: %s\n", strjoin(columnNames, ", "));
+    %fprintf("Data Types: %s\n", strjoin(dataTypes, ", "));
+    %fprintf("Bytes per Column: %s\n", mat2str(bytesPerCol));
+    
+    totalBytesPerRow = sum(bytesPerCol);
+    %fprintf("Total Bytes Per Row: %d\n", totalBytesPerRow);
 end
-
-
 
 
 

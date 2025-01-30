@@ -22,4 +22,9 @@ octave-workspace
 .autosave
 # data files to be analyzed
 *.txt
+
+# raw ECLab data files
 *.mpr
+
+# any other data in the /data folder
+data/
