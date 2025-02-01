@@ -537,18 +537,82 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
     flag_columns = containers.Map('KeyType', 'double', 'ValueType', 'any');
 
     % Define standard columns
-    data_columns(4)   = {'double', 'time', 8};  
-    data_columns(5)   = {'single', 'control_V_I', 4};  
-    data_columns(6)   = {'single', 'Ewe', 4}; 
-    data_columns(7)   = {'double', 'dq', 8};
-    data_columns(13)  = {'double', '(Q-Qo)', 8};
-    data_columns(19)  = {'single', 'control_V', 4};
-    data_columns(20)  = {'single', 'control_I', 4}; % ✅ Added control_I
-    data_columns(24)  = {'uint8', 'Ns', 1}; % ✅ Added Ns
-    data_columns(39)  = {'uint16', 'I_Range', 2};
-    data_columns(131) = {'uint16', 'Ns', 2};   % ✅ Ensure Ns is 2 bytes
-    data_columns(467) = {'double', 'Q_charge_or_discharge', 8};
-    data_columns(468) = {'uint32', 'half cycle', 4}; % ✅ Ensure half cycle is 4 bytes
+    data_columns(4)   = {'double', 'time', 8};  % Time (s)
+    data_columns(5)   = {'single', 'control_V_I', 4};  % Control Voltage/Current (V/mA)
+    data_columns(6)   = {'single', 'Ewe', 4}; % Working Electrode Voltage (V)
+    data_columns(7)   = {'double', 'dq', 8};  % Charge increment (mA·h)
+    data_columns(8)   = {'single', 'I', 4};  % Current (mA)
+    data_columns(9)   = {'single', 'Ece', 4}; % Counter Electrode Voltage (V)
+    data_columns(11)  = {'double', '<I>', 8}; % Mean Current (mA)
+    data_columns(13)  = {'double', '(Q-Qo)', 8}; % Charge Difference (mA·h)
+    data_columns(16)  = {'single', 'Analog IN 1', 4}; % Analog Input 1 (V)
+    data_columns(17)  = {'single', 'Analog IN 2', 4}; % Analog Input 2 (V)
+    data_columns(19)  = {'single', 'control_V', 4}; % Control Voltage (V)
+    data_columns(20)  = {'single', 'control_I', 4}; % Control Current (mA)
+    data_columns(23)  = {'double', 'dQ', 8}; % Charge increment (mA·h)
+    data_columns(24)  = {'double', 'cycle number', 8}; % Cycle Number
+    data_columns(32)  = {'single', 'freq', 4}; % Frequency (Hz)
+    data_columns(33)  = {'single', '|Ewe|', 4}; % Absolute Working Electrode Voltage (V)
+    data_columns(34)  = {'single', '|I|', 4}; % Absolute Current (A)
+    data_columns(35)  = {'single', 'Phase(Z)', 4}; % Phase Angle (deg)
+    data_columns(36)  = {'single', '|Z|', 4}; % Impedance Magnitude (Ω)
+    data_columns(37)  = {'single', 'Re(Z)', 4}; % Real Part of Impedance (Ω)
+    data_columns(38)  = {'single', '-Im(Z)', 4}; % Imaginary Part of Impedance (Ω)
+    data_columns(39)  = {'uint16', 'I_Range', 2}; % Current Range
+    data_columns(69)  = {'single', 'R', 4}; % Resistance (Ω)
+    data_columns(70)  = {'single', 'P', 4}; % Power (W)
+    data_columns(74)  = {'double', '|Energy|', 8}; % Absolute Energy (W·h)
+    data_columns(75)  = {'single', 'Analog OUT', 4}; % Analog Output (V)
+    data_columns(76)  = {'single', '<I>', 4}; % Mean Current (mA)
+    data_columns(77)  = {'single', '<Ewe>', 4}; % Mean Working Electrode Voltage (V)
+    data_columns(78)  = {'single', 'Cs⁻²', 4}; % Capacitance Inverse (µF⁻²)
+    data_columns(96)  = {'single', '|Ece|', 4}; % Absolute Counter Electrode Voltage (V)
+    data_columns(98)  = {'single', 'Phase(Zce)', 4}; % Phase of Zce (deg)
+    data_columns(99)  = {'single', '|Zce|', 4}; % Impedance of Zce (Ω)
+    data_columns(100) = {'single', 'Re(Zce)', 4}; % Real Part of Zce (Ω)
+    data_columns(101) = {'single', '-Im(Zce)', 4}; % Imaginary Part of Zce (Ω)
+    data_columns(123) = {'double', 'Energy_charge', 8}; % Energy Charge (W·h)
+    data_columns(124) = {'double', 'Energy_discharge', 8}; % Energy Discharge (W·h)
+    data_columns(125) = {'double', 'Capacitance_charge', 8}; % Capacitance Charge (µF)
+    data_columns(126) = {'double', 'Capacitance_discharge', 8}; % Capacitance Discharge (µF)
+    data_columns(131) = {'uint16', 'Ns', 2}; % Number of Samples
+    data_columns(163) = {'single', '|Estack|', 4}; % Absolute Stack Voltage (V)
+    data_columns(168) = {'single', 'Rcmp', 4}; % Compensation Resistance (Ω)
+    data_columns(169) = {'single', 'Cs', 4}; % Capacitance (µF)
+    data_columns(172) = {'single', 'Cp', 4}; % Capacitance Parallel (µF)
+    data_columns(173) = {'single', 'Cp⁻²', 4}; % Capacitance Inverse (µF⁻²)
+    data_columns(174) = {'single', '<Ewe>', 4}; % Mean Working Electrode Voltage (V)
+    data_columns(178) = {'single', '(Q-Qo)', 4}; % Charge Difference (C)
+    data_columns(179) = {'single', 'dQ', 4}; % Charge Increment (C)
+    data_columns(182) = {'double', 'step time', 8}; % Step Time (s)
+    data_columns(185) = {'single', '<Ece>', 4}; % Mean Counter Electrode Voltage (V)
+    data_columns(211) = {'double', 'Q_charge_or_discharge', 8}; % Charge or Discharge (C)
+    data_columns(217) = {'single', 'THD Ewe', 4}; % Total Harmonic Distortion Ewe (%)
+    data_columns(241) = {'single', '|E1|', 4}; % Absolute E1 (V)
+    data_columns(242) = {'single', '|E2|', 4}; % Absolute E2 (V)
+    data_columns(271) = {'single', 'Phase(Z1)', 4}; % Phase of Z1 (deg)
+    data_columns(272) = {'single', 'Analog IN 1', 4}; % Analog Input 1 (V)
+    data_columns(295) = {'uint16', 'I Range', 2}; % Current Range
+    data_columns(301) = {'single', '|Z1|', 4}; % Impedance of Z1 (Ω)
+    data_columns(302) = {'single', '|Z2|', 4}; % Impedance of Z2 (Ω)
+    data_columns(326) = {'single', 'P', 4}; % Power (W)
+    data_columns(331) = {'single', 'Re(Z1)', 4}; % Real Part of Z1 (Ω)
+    data_columns(332) = {'single', 'Re(Z2)', 4}; % Real Part of Z2 (Ω)
+    data_columns(361) = {'single', '-Im(Z1)', 4}; % Imaginary Part of Z1 (Ω)
+    data_columns(362) = {'single', '-Im(Z2)', 4}; % Imaginary Part of Z2 (Ω)
+    data_columns(379) = {'double', 'Energy charge', 8}; % Energy Charge (W·h)
+    data_columns(391) = {'single', '<E1>', 4}; % Mean E1 (V)
+    data_columns(392) = {'single', '<E2>', 4}; % Mean E2 (V)
+    data_columns(422) = {'single', 'Phase(Zstack)', 4}; % Phase of Zstack (deg)
+    data_columns(423) = {'single', '|Zstack|', 4}; % Impedance of Zstack (Ω)
+    data_columns(424) = {'single', 'Re(Zstack)', 4}; % Real Part of Zstack (Ω)
+    data_columns(425) = {'single', '-Im(Zstack)', 4}; % Imaginary Part of Zstack (Ω)
+    data_columns(434) = {'single', '(Q-Qo)', 4}; % Charge Difference (C)
+    data_columns(435) = {'single', 'dQ', 4}; % Charge Increment (C)
+    data_columns(441) = {'single', '<Ece>', 4}; % Mean Counter Electrode Voltage (V)
+    data_columns(462) = {'single', 'Temperature', 4}; % Temperature (°C)
+    data_columns(467) = {'double', 'Q charge or discharge', 8}; % Charge or Discharge (mA·h)
+    data_columns(468) = {'uint32', 'half cycle', 4}; % Half Cycle
 
     % Define flag bitmask columns (these should be combined into a single Flags byte)
     flag_columns(1)  = {3, 'mode', 2};  
@@ -597,8 +661,8 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
             %fprintf("[Column Added] ID: %d -> Name: %s, Type: %s, Bytes: %d\n", ...
             %        colID, val{2}, val{1}, val{3});
         else
-            warning('Unknown column ID', colID)
             fprintf("[Warning] Unknown column ID: %d\n", colID);
+            error('Unknown column ID', colID)
         end
     end
 
