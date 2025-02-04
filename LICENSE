@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 boblansdorp
+Copyright (c) 2025 Bob Lansdorp
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+### EXCEPTION ###
+The file `third_party/parseBiologicMPR.m` is subject to the GNU General Public License (GPL).
+Please refer to `third_party/LICENSE_GPL.txt` for more details.
+
