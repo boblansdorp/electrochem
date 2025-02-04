@@ -1,12 +1,16 @@
 % =====================
-% Import and Initialize
+% Import
 % =====================
 format long g;
-data = readmatrix("PITT1.txt"); %text file was created using ECLab Software custom txt export function
+data = readmatrix("data/PITT1.txt"); %text file was created using ECLab Software custom txt export function
+
+% =====================
+% Initialize
+% =====================
 
 % Define the threshold for step changes (1 mV = 0.001 V)
 threshold = 0.001;
-EPSILON = 1e-12; %safeguard variable to prevent dividing by zero
+EPSILON = 1e-16; %safeguard variable to prevent dividing by zero
 MILLIAMPS_TO_AMPS = 1000;
 FUDGE_FACTOR = 0; %-1.7e-7;
 % Initialize variables

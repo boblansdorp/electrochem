@@ -27,7 +27,7 @@ function [bestParams, bestResnorm] = PittFitMontella(t_data, I_data, Lambda_tau_
     % -----------------------------
     % 2) Generate Initial Guess Array
     % -----------------------------
-    scalingFactors = [1/4, 1/2, 1, 2, 4]; % Define scaling factors
+    scalingFactors = [1/64, 1/16,  1/4, 1, 4, 16, 64]; % Define scaling factors
     InitialGuess_Array = []; % Initialize array to store combinations
 
     % Generate all combinations using nested for loops

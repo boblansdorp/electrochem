@@ -1,6 +1,6 @@
 
 function plotResults(Lambda_tau_DeltaQ_array, resnorm_array, totalChargeArray, steps, I_model_Komayko)
-    indexesToPlot = [20, 40, 60, 80, 100];
+    indexesToPlot = [20, 40, 60, 80, 100, 120, 140];
 
     figure;
     
@@ -34,15 +34,43 @@ function plotResults(Lambda_tau_DeltaQ_array, resnorm_array, totalChargeArray, s
     
     
     % Plot resnorm
-    yyaxis right; % Use right y-axis
-    plot(resnorm_array, 'r-s', 'LineWidth', 1.5, 'DisplayName', 'Residual Norm');
-    ylabel('Residual Norm');
+    % yyaxis right; % Use right y-axis
+    % plot(resnorm_array, 'r-s', 'LineWidth', 1.5, 'DisplayName', 'Residual Norm');
+    % ylabel('Residual Norm');
     
     % Customize plot
     title('Diffusion Coefficient Parameter τ and Residual Norm vs. Step Number');
     legend('show');
     
+
+
     figure;
+    
+    % Plot diffusion coefficient
+    yyaxis left; % Use left y-axis
+    %10^-12 cm^2 per particle
+    plot(10^-12./Lambda_tau_DeltaQ_array(:, 2), 'b-o', 'LineWidth', 1.5, 'DisplayName', 'Diffusion Coefficient');
+    ylabel('D (cm^2/s)'); % Use LaTeX-like syntax for special characters
+    xlabel('Step Number');
+    grid on;
+    
+    % Set the left y-axis range
+    ylim([8*10^(-14) 4*10^(-12)]); % Set the range for the left y-axis
+    set(gca, 'YScale', 'log'); % Set left y-axis to logarithmic scale
+    
+    
+    % Plot resnorm
+    % yyaxis right; % Use right y-axis
+    % plot(resnorm_array, 'r-s', 'LineWidth', 1.5, 'DisplayName', 'Residual Norm');
+    % ylabel('Residual Norm');
+    
+    % Customize plot
+    title('Diffusion Coefficient D vs. Step Number');
+    legend('show');
+    
+
+    figure;
+    
     
     % Plot DeltaQ
     yyaxis left; % Use left y-axis
@@ -123,11 +151,11 @@ function plotResults(Lambda_tau_DeltaQ_array, resnorm_array, totalChargeArray, s
         %t_inv_sqrt = 1 ./ sqrt(stepOfInterest_time_current(:, 1)); % Compute t^{-1/2}
         
         % Plot experimental data
-        plot(stepOfInterest_time_current(:, 1), stepOfInterest_time_current(:, 2), 'o', 'Color', colors(i, :), ...
+        semilogx(stepOfInterest_time_current(:, 1), stepOfInterest_time_current(:, 2), 'o', 'Color', colors(i, :), ...
             'MarkerSize', 8, 'DisplayName', sprintf('Experimental (Index %d)', indexToPlot));
         
         % Plot theoretical data
-        plot(stepOfInterest_time_current(:, 1), I_fitted, '-', 'Color', colors(i, :), ...
+        semilogx(stepOfInterest_time_current(:, 1), I_fitted, '-', 'Color', colors(i, :), ...
             'LineWidth', 2, 'DisplayName', sprintf('Theoretical (Index %d)', indexToPlot));
     end
     
@@ -138,9 +166,51 @@ function plotResults(Lambda_tau_DeltaQ_array, resnorm_array, totalChargeArray, s
     ylabel('Current (A)');
     title('Transient Current vs. time');
     %xlim([0, 3]); % Adjust x-axis limits
+    ylim([0, 2E-6]); % Adjust x-axis limits
+
     grid on;
     legend('show'); % Display the legend
     hold off; % Release the hold on the current figure
+    
+
+
+    
+    figure; % Create a single figure with time linear for all plots
+    hold on; % Enable overlaying multiple plots
+    
+    for i = 1:length(indexesToPlot)
+        indexToPlot = indexesToPlot(i);
+        
+        % Extract step data
+        [stepOfInterest, stepOfInterest_time_current] = extractStep(steps, indexToPlot);
+        
+        % Compute theoretical and experimental data
+        I_fitted = I_model_Komayko(Lambda_tau_DeltaQ_array(indexToPlot,:), stepOfInterest_time_current(:, 1));
+        %t_inv_sqrt = 1 ./ sqrt(stepOfInterest_time_current(:, 1)); % Compute t^{-1/2}
+        
+        % Plot experimental data
+        semilogx(stepOfInterest_time_current(:, 1), stepOfInterest_time_current(:, 2), 'o', 'Color', colors(i, :), ...
+            'MarkerSize', 8, 'DisplayName', sprintf('Experimental (Index %d)', indexToPlot));
+        
+        % Plot theoretical data
+        semilogx(stepOfInterest_time_current(:, 1), I_fitted, '-', 'Color', colors(i, :), ...
+            'LineWidth', 2, 'DisplayName', sprintf('Theoretical (Index %d)', indexToPlot));
+    end
+    
+    % Customize the graph
+    xlabel('t (s)');
+    set(gca, 'XScale', 'log'); % Explicitly set the x-axis to logarithmic
+    
+    ylabel('Current (A)');
+    title('Transient Current vs. time');
+    %xlim([0, 3]); % Adjust x-axis limits
+    ylim([0, 2E-6]); % Adjust x-axis limits
+
+    grid on;
+    legend('show'); % Display the legend
+    hold off; % Release the hold on the current figure
+    
+
     
     %check that I*sqrt(t) vs log(t) has a curve similar to predictions
     figure; % Create a new figure with a logarithmic x-axis
@@ -177,6 +247,8 @@ function plotResults(Lambda_tau_DeltaQ_array, resnorm_array, totalChargeArray, s
     ylabel('Current * sqrt(t) (A sqrt(s))'); % Label y-axis
     title('Transient Current vs. Time (Logarithmic Scale)');
     set(gca, 'XScale', 'log'); % Explicitly set the x-axis to logarithmic
+     ylim([0, 2E-6]); % Adjust x-axis limits
+
     grid on; % Enable grid
     legend('show'); % Show legend
     hold off; % Release hold on current figure
