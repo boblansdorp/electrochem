@@ -26,38 +26,42 @@ function parsedMPR = parseBiologicMPR(filename)
 %
 % Usage:
 %   dataStruct = parseBiologicMPR('myFile.mpr')
-
+    
     fid = fopen(filename, 'rb');
     if fid < 0
         error('Could not open file: %s', filename);
     end
+        
+    % Define expected magic as raw bytes (matching Python `file_magic`)
+    expectedMagic = uint8([ ...
+        'BIO-LOGIC MODULAR FILE', 26, ...  % '\x1A' (SUB character)
+        repmat(' ', 1, 25), ...  % Spaces (25 bytes)
+        0, 0, 0, 0]);  % Null bytes (4 bytes)
+    
+    % 1) Read the first N bytes (same as Python `file_magic`)
+    magicBytes = fread(fid, [1,length(expectedMagic)], '*uint8');  % Read as raw bytes
 
-    % 1) Check magic (roughly 64 bytes from typical exports, your version may differ)
-    magicBytes = fread(fid, [1,64], '*char');
-    magicBytes = fread(fid, [1,28], '*char'); %maybe remove this, need some testing functions for different versions!
 
-    magicStr = deblank(char(magicBytes));
-    expectedMagic = 'BIO-LOGIC MODULAR FILE';
-    if ~contains(magicStr, expectedMagic)
+    % Check magic exactly like Python does
+    if ~isequal(magicBytes, expectedMagic)
         fclose(fid);
-        error('Not a recognized .mpr file. Expected magic: %s', expectedMagic);
+        error('Not a recognized .mpr file. Magic header mismatch.');
     end
-
+    
     % 2) Read the remainder of the file as raw bytes
     remainder = fread(fid, '*uint8')';
     fclose(fid);
-
+    
     % Convert to char for naive splitting by "MODULE"
-    textAll = char(remainder);
+    textAll = char(remainder);    
     parts = strsplit(textAll, 'MODULE');
-    
-    % The first chunk (parts{1}) is usually leftover text after the file magic block
-    % or possibly empty. The subsequent chunks are each "modules."
-    
+
     % Initialize output structure
     parsedMPR = struct();
     parsedMPR.Modules = {};
-    %disp(length(parts))
+
+    % The first chunk (parts{1}) is usually leftover text after the file magic block
+    % or possibly empty. The subsequent chunks are each "modules."
     for iModule = 2:length(parts)
         rawModuleText = parts{iModule};
         rawModule = uint8(rawModuleText); % Convert back to bytes for binary reading
