@@ -1,0 +1,5 @@
+This file, `parseBiologicMPR.m`, is a derivative work based on yadg (https://github.com/dgbowl/yadg), which was originally licensed under GPLv3.
+
+As required by GPLv3, any modifications or derivative works of this script must also be licensed under GPLv3.
+
+For more information, see <https://www.gnu.org/licenses/gpl-3.0.html>.
