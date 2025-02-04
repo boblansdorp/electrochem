@@ -46,71 +46,112 @@ function parsedMPR = parseBiologicMPR(filename)
     %disp(length(parts))
     for iModule = 2:length(parts)
         rawModuleText = parts{iModule};
-        % Convert back to bytes for binary reading
-        rawModule = uint8(rawModuleText);
-
-                % Ensure we're reading 'short_name' correctly
-        %rawStr = char(rawModule(1:48));  % First 16 bytes should be ASCII
-        %disp("Raw extracted short_name:");
-        %disp(rawStr);
-
-
-
-        % === Parse the module header ===
-        % We'll demonstrate reading a few fields as ASCII or numeric at fixed offsets.
-        % (Adjust these offsets to match your actual .mpr layout.)
-        
-        % For demonstration, let's do something like the "module_header_dtypes" approach:
-        %   short_name:  at offset 0,  10 bytes
-        %   long_name:   at offset 10, 25 bytes
-        %   length:      at offset 35, 4 bytes (little-endian uint32)
-        %   oldver:      at offset 39, 4 bytes
-        %   newver:      at offset 43, 4 bytes
-        %   date:        at offset 47, 8 bytes
+        rawModule = uint8(rawModuleText); % Convert back to bytes for binary reading
+                
+        % ===========================================================
+        % Module Header Formats in Biologic VMP3 .mpr Files
+        % ===========================================================
+        % The module headers can follow two different formats:
         %
-        % We'll read them carefully, but the real offsets might differ.
+        % 1. **Newer Header Format (59 bytes total)**
+        %    - Includes `max_length` and `newver` fields.
+        %    - Used in newer versions where `newver` helps determine the file version.
+        %    - Field layout:
+        %      | Offset | Field        | Type    | Size (bytes) |
+        %      |--------|-------------|---------|-------------|
+        %      | 0      | short_name  | char[10]| 10          |
+        %      | 10     | long_name   | char[25]| 25          |
+        %      | 35     | max_length  | uint32  | 4           |
+        %      | 39     | length      | uint32  | 4           |
+        %      | 43     | oldver      | uint32  | 4           |
+        %      | 47     | newver      | uint32  | 4           |
+        %      | 51     | date        | char[8] | 8           |
+        %      |--------|-------------|---------|-------------|
+        %      | Total  |             |         | **59 bytes** |
         %
-        % We also need to ensure we don't exceed rawModule length:
-        
-        if numel(rawModule) < 55
-            % Not enough data to parse all fields
+        % 2. **Older Header Format (51 bytes total)**
+        %    - Does **not** include `max_length` or `newver`.
+        %    - `oldver` alone is used to determine the version.
+        %    - Field layout:
+        %      | Offset | Field        | Type    | Size (bytes) |
+        %      |--------|-------------|---------|-------------|
+        %      | 0      | short_name  | char[10]| 10          |
+        %      | 10     | long_name   | char[25]| 25          |
+        %      | 35     | length      | uint32  | 4           |
+        %      | 39     | oldver      | uint32  | 4           |
+        %      | 43     | date        | char[8] | 8           |
+        %      |--------|-------------|---------|-------------|
+        %      | Total  |             |         | **51 bytes** |
+                % Ensure we have enough bytes for header parsing
+
+
+        HEADER_LENGTH_NEW = 59;
+        HEADER_LENGTH_OLD = 51;
+
+
+        if numel(rawModule) < min(HEADER_LENGTH_OLD, HEADER_LENGTH_NEW)
             warning('Module chunk %d is too short to parse header fully.', iModule-1);
             continue;
         end
 
-        shortName = char(rawModule(1:10));
-        %disp(shortName)
-        longName  = char(rawModule(11:35));
-        %disp(longName)
+        % Extract module header fields
+        shortName  = char(rawModule(1:10));
+        longName   = char(rawModule(11:35));
+    
+        lengthBytesOld = typecast(rawModule(36:39), 'uint32'); % Read length
+        lengthBytesNew = typecast(rawModule(40:43), 'uint32'); % Read length
 
-        % lengthBytes = typecast(rawModule(36:39), 'uint32'); % little-endian assumed
-        % oldverBytes = typecast(rawModule(40:43), 'uint32');
-        % newverBytes = typecast(rawModule(44:47), 'uint32');
-        % dateBytes   = char(rawModule(48:55));
-        % (5-field version, total 51 bytes in the header)
-        lengthBytes = typecast(rawModule(36:39), 'uint32');
-        oldverBytes = typecast(rawModule(40:43), 'uint32');
-        dateBytes   = char(rawModule(44:51));
-        moduleData  = rawModule(52:end);
+        if (length(rawModule) == lengthBytesOld + HEADER_LENGTH_OLD)
+            debug_fprintf("Module matches old header type")
+            lengthVal = double(lengthBytesOld);
+            oldverBytes = typecast(rawModule(40:43), 'uint32'); % Read old version
+            newverBytes = 0; % just set to zero if it doesn't exist
+            version = double(oldverBytes);
+            dateBytes   = char(rawModule(44:51)); % Read date (if applicable)
+            % The actual module data portion is everything after these 55 bytes 
+            moduleData = rawModule(52:end); 
 
-        lengthVal   = double(lengthBytes);
-        %disp("lengthVal: ")
+        elseif (length(rawModule) == lengthBytesNew + HEADER_LENGTH_NEW)
+            debug_fprintf("Module matches new header type!")
+            lengthVal = double(lengthBytesNew);
+            oldverBytes = typecast(rawModule(44:47), 'uint32'); % Read old version
+            %disp(oldverBytes)
 
-        %disp(lengthVal)
+            newverBytes = typecast(rawModule(48:51), 'uint32'); % Read new version
+            %disp(newverBytes)
+            version = double(newverBytes);
+            dateBytes   = char(rawModule(52:59)); % Read date (if applicable)
+            moduleData = rawModule(60:end);             % The actual module data portion is everything after these 55 bytes 
 
+        else
+             disp("Error: Module does not match either old or new header type")
+             error('Header module length does not match expected length')
+        end
+
+        % Determine minver based on version
+        if version >= 10
+            minver = "11.50";
+        else
+            minver = "10.40";
+        end
+    
+        % Store in structure
         modHeader = struct();
         modHeader.short_name = strtrim(shortName);
         modHeader.long_name  = strtrim(longName);
-        modHeader.length     = double(lengthBytes);
+        modHeader.length     = lengthVal;
         modHeader.oldver     = double(oldverBytes);
-        %modHeader.newver     = double(newverBytes);
+        modHeader.newver     = double(newverBytes);
+        modHeader.version    = version;
         modHeader.date       = strtrim(dateBytes);
+        modHeader.minver     = minver;
+    
+        debug_fprintf("Read '%s' with version '%d' ('%s')\n", modHeader.short_name, version, minver);
 
-        % The actual module data portion is everything after these 55 bytes
-        %moduleData = rawModule(56:end);
 
-        %disp('First 32 bytes of moduleData (hex):');
-        %disp(dec2hex(moduleData(1:32)));  % Print hex values for debugging
+ 
+        %disp('First 32 bytes of moduleData (hex):'); 
+        %disp(dec2hex(moduleData(1:32)));  % Print hex values for debugging 
         
 
         % 3) Dispatch based on short_name or long_name
@@ -262,10 +303,15 @@ function paramStruct = localParseTechniqueParams(moduleData, techniqueName, modH
     % Search for `ns` dynamically
     %base_offset_candidates = [hex2dec('1843'), hex2dec('1844'), hex2dec('1845'), hex2dec('1846')];
     ns_offset = hex2dec('1845');
+    %ns_offset = hex2dec('1846');
+
+
     raw_ns = moduleData(ns_offset : ns_offset + 1);
+
     ns = typecast(raw_ns, 'uint16');
     swapped_ns = swapbytes(ns);
     ns = min(ns, swapped_ns); % Take the more reasonable value
+    debug_fprintf('Final chosen ns_offset = 0x%X: ns=%d\n', ns_offset, ns);
 
     % Validate `ns`
     % if ns > 0 && ns < 100
@@ -289,7 +335,7 @@ function paramStruct = localParseTechniqueParams(moduleData, techniqueName, modH
         n_params = swapped_np;
     end
 
-    fprintf('Final chosen n_params offset = 0x%X: n_params=%d\n', np_offset, n_params);
+    debug_fprintf('Final chosen n_params offset = 0x%X: n_params=%d\n', np_offset, n_params);
     
     % Store results
     paramStruct.ns = ns;
@@ -384,16 +430,23 @@ end
 
 function out = parseVMPData(moduleData, modHeader)
 %PARSEVMPDATA - Parses "VMP data" from Biologic MPR files row-by-row.
-
+    % some code from Python started indices at 0 whereas matlab starts arrays at 1
+    CONSTANT_ZERO_TO_ONE_ARRAY_INDEX = 1;
+    
     out = struct();
     out.DataPoints  = [];
     out.Columns     = {};
     out.ColumnIDs   = [];
 
     % Step 1: Read header info
-    offset = 1;
-    nDataPoints = typecast(moduleData(offset + (0:3)), 'uint32');
-    nColumns    = double(moduleData(offset + 4));
+    %disp('moduleData: ')
+    %disp(moduleData(1:10))
+    
+    nDataPoints = typecast(moduleData((0:3) + CONSTANT_ZERO_TO_ONE_ARRAY_INDEX), 'uint32');
+    nColumns    = double(moduleData(4+CONSTANT_ZERO_TO_ONE_ARRAY_INDEX));
+    debug_fprintf("nDataPoints: %d\n", nDataPoints)
+    debug_fprintf("nColumns: %d\n", nColumns)
+
 
     if nColumns == 0 || nColumns > 100
         warning('[parseVMPData] Failed to detect valid nColumns.');
@@ -401,7 +454,7 @@ function out = parseVMPData(moduleData, modHeader)
     end
 
     % Step 2: Extract column IDs
-    colIDStart = offset + 5;
+    colIDStart = 5;
     colIDEnd = colIDStart + (2 * nColumns) - 1;
 
     if colIDEnd > length(moduleData)
@@ -409,8 +462,24 @@ function out = parseVMPData(moduleData, modHeader)
         return;
     end
 
-    columnIDBytes = moduleData(colIDStart:colIDEnd);
-    columnIDs = typecast(columnIDBytes, 'uint16');
+    %disp(modHeader)
+
+
+    if ismember(modHeader.version, [10, 11])
+        % Read big-endian (">u2" in NumPy)
+        columnIDs = typecast(swapbytes(typecast(moduleData(6:6 + 2 * nColumns - 1), 'uint16')), 'uint16');
+    elseif ismember(modHeader.version, [2, 3])
+        % Read little-endian ("<u2" in NumPy)
+        columnIDs = typecast(moduleData(6:6 + 2 * nColumns - 1), 'uint16');
+    else 
+        error('no version detected in modHeader')
+    end
+
+
+    %columnIDBytes = moduleData((colIDStart:colIDEnd)+CONSTANT_ZERO_TO_ONE_ARRAY_INDEX);
+    %disp(columnIDBytes(1:10))
+
+    %columnIDs = typecast(columnIDBytes, 'uint16');
     out.ColumnIDs = columnIDs;
 
     % Step 3: Get column names, data types, and bytes per column
@@ -419,19 +488,21 @@ function out = parseVMPData(moduleData, modHeader)
     bytesPerRow = sum(bytesPerCol);
 
     % Step 4: Determine data start offset
-    if modHeader.oldver == 3
-        dataStart = hex2dec('196');
-    elseif modHeader.oldver == 2
-        dataStart = hex2dec('195');
-    elseif modHeader.oldver == 10 || modHeader.oldver == 11
-        dataStart = hex2dec('3EF');
+
+    if modHeader.version == 3
+        dataStart = hex2dec('196') + CONSTANT_ZERO_TO_ONE_ARRAY_INDEX;
+    elseif modHeader.version == 2
+        dataStart = hex2dec('195') + CONSTANT_ZERO_TO_ONE_ARRAY_INDEX;
+    elseif modHeader.version == 10 || modHeader.version == 11
+        dataStart = hex2dec('3EF') + CONSTANT_ZERO_TO_ONE_ARRAY_INDEX;
     else
-        dataStart = hex2dec('195');
+        disp(modHeader)
+        error('no version detected'); % this probably indicates a problem, maybe not
+        dataStart = hex2dec('195') + CONSTANT_ZERO_TO_ONE_ARRAY_INDEX;
     end
 
-    dataStart = hex2dec('197'); %hardcoded value!! uh oh!
+    debug_fprintf("Data offset: 0x%x\n", dataStart)
 
-    fprintf("Data offset: 0x%x\n", dataStart)
     bytesNeeded = nDataPoints * bytesPerRow;
     dataEnd = dataStart + bytesNeeded - 1;
 
@@ -460,9 +531,9 @@ function out = parseVMPData(moduleData, modHeader)
             colBytes = rowBytes(rowOffset:rowOffset + numBytes - 1);
     
             % Only print debugging info for first 10 rows
-            % if rowIdx <= 10
-            %     fprintf("Row %d, Column %d (%s, %d bytes): %s\n", rowIdx, colIdx, colType, numBytes, mat2str(colBytes));
-            % end
+            if rowIdx <= 10
+                debug_fprintf("Row %d, Column %d (%s, %d bytes): %s\n", rowIdx, colIdx, colType, numBytes, mat2str(colBytes));
+            end
     
             % Convert based on type
             switch colType
@@ -628,14 +699,14 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
     flagInfo = struct();
     haveFlagsColumn = false;
 
-    %fprintf("\n=== Debugging lookupColumnTypes ===\n");
-    %fprintf("Detected columnIDs: %s\n", mat2str(columnIDs));
+    debug_fprintf("\n=== Debugging lookupColumnTypes ===\n");
+    debug_fprintf("Detected columnIDs: %s\n", mat2str(columnIDs));
 
     for i = 1:numel(columnIDs)
         colID = columnIDs(i);
         
         if ismember(colID, FLAGS_GROUP)
-            %fprintf("[Flag Detected] ID: %d (Adding to Flags Byte)\n", colID);
+            debug_fprintf("[Flag Detected] ID: %d (Adding to Flags Byte)\n", colID);
             
             if ~haveFlagsColumn
                 haveFlagsColumn = true;
@@ -643,14 +714,14 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
                 dataTypes{end+1} = 'uint8';
                 bytesPerCol(end+1) = 1;
                 flagInfo.Flags = struct();
-                %fprintf("  -> Flags column initialized (1 byte)\n");
+                debug_fprintf("  -> Flags column initialized (1 byte)\n");
             end
     
             flagData = flag_columns(colID);
             bitmask = flagData{1};
             flagName = flagData{2};
             flagInfo.Flags.(flagName) = struct('bitmask', bitmask);
-            %fprintf("  -> Flag '%s' (bitmask: %d) added to Flags Byte.\n", flagName, bitmask);
+            debug_fprintf("  -> Flag '%s' (bitmask: %d) added to Flags Byte.\n", flagName, bitmask);
     
         elseif isKey(data_columns, colID)
             val = data_columns(colID);
@@ -658,11 +729,11 @@ function [columnNames, dataTypes, bytesPerCol, flagInfo] = lookupColumnTypes(col
             dataTypes{end+1} = val{1};
             bytesPerCol(end+1) = val{3};
     
-            %fprintf("[Column Added] ID: %d -> Name: %s, Type: %s, Bytes: %d\n", ...
-            %        colID, val{2}, val{1}, val{3});
+            debug_fprintf("[Column Added] ID: %d -> Name: %s, Type: %s, Bytes: %d\n", ...
+                    colID, val{2}, val{1}, val{3});
         else
-            fprintf("[Warning] Unknown column ID: %d\n", colID);
-            error('Unknown column ID', colID)
+            debug_fprintf("[Warning] Unknown column ID: %d\n", colID);
+            %error('Unknown column ID', colID)
         end
     end
 
@@ -693,4 +764,15 @@ function out = parseVMPLoop(moduleData, modHeader)
 
     out = struct();
     % ...
+end
+
+
+function debug_fprintf(varargin)
+    % Helper function to print debug logs if flag is true
+    % Usage: debug_fprintf(DEBUG_FLAG, 'Your message %d', value);
+    DEBUG_TRUE = false; % set to true to enable debug logs!
+
+    if DEBUG_TRUE
+        fprintf(varargin{:});
+    end
 end
