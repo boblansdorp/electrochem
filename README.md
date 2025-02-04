@@ -2,6 +2,10 @@
 This project is used for analysis of electrochemistry data.
 That includes importing raw data from MPR files created by ECLab Software as well as subsequent analysis and fitting to models
 
+![Electrochem](https://raw.githubusercontent.com/boblansdorp/electrochem/main/screenshot.png)
+
+Data was included from a Biologic DC3 Dummy Cell and best fit parameters extracted and compared to actual.
+
 ## Licensing
 
 This repository contains MATLAB scripts with different licensing terms:
