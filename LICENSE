@@ -24,3 +24,6 @@ SOFTWARE.
 The file `third_party/parseBiologicMPR.m` is subject to the GNU General Public License (GPL).
 Please refer to `third_party/LICENSE_GPL.txt` for more details.
 
+### EXCEPTION ###
+The file `third_party/Zfit.m` is subject to a seperate license. Please refer to `third_party/license_Zfit.txt` for more details.
+
