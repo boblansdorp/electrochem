@@ -39,6 +39,15 @@ classdef testZFit < matlab.unittest.TestCase
             % Run Zfit WITHOUT PLOTS
             [p, ~, ~] = Zfit(varargin, '', circuit, param, indexes, 'fitNP', LB);
             
+            % Corresponding units for each parameter
+            units = {'Ω', 'Ω', 'F', 'Ω', 'F'};
+            
+            % Display each parameter with scientific notation and appropriate units
+            fprintf('Best Fit Parameter values vs Expected:\n');
+            for i = 1:length(p)
+                fprintf('Fit(%d) = %.3e %s, Expected(%d) = %.3e %s \n', i, p(i), units{i}, i, nominal_p(i), units{i});
+            end
+
             % Close hidden figures if Zfit still generates any
             close all hidden;
 

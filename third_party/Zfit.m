@@ -186,7 +186,7 @@ function [pbest,zbest,fval,exitflag,output]=Zfit(varargin)
 %modified october 2007
 %minor corrections april 2008
 %mars 2010, the way circuit is entered has been modified to ease the use
-%janvier 2020, now the operators “s” and “p” may 
+%janvier 2020, now the operators ï¿½sï¿½ and ï¿½pï¿½ may 
 % handle more than 2 elements as arguments. Warm thank to Hazrul Shabri who
 % offered the code in the Mathworks File exchange.
 %dellisjeanluc@gmail.com
@@ -315,7 +315,7 @@ for i=1:2:length(element-2)
     nlp=str2num(element(i+1));% idendify its numeral
     localparam=param(1:nlp);% get its parameter values
     param=param(nlp+1:end);% remove them from param
-    func=[element(i),'([',num2str(localparam),']',',freq)'];% buit an functionnal string
+    func=[element(i),'([',num2str(localparam),']',',freq)']; % buit an functionnal string
     z(:,k)=eval(func);% compute its impedance for all the frequencies
     % modify the initial circuit string to make it functionnal (when used
     % with eval)
