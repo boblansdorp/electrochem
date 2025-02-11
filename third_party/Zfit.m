@@ -186,7 +186,7 @@ function [pbest,zbest,fval,exitflag,output]=Zfit(varargin)
 %modified october 2007
 %minor corrections april 2008
 %mars 2010, the way circuit is entered has been modified to ease the use
-%janvier 2020, now the operators ï¿½sï¿½ and ï¿½pï¿½ may 
+%janvier 2020, now the operators “s” and “p” may 
 % handle more than 2 elements as arguments. Warm thank to Hazrul Shabri who
 % offered the code in the Mathworks File exchange.
 %dellisjeanluc@gmail.com
@@ -337,6 +337,55 @@ z=1i*2*pi*f*p;
 end
 function z=E(p,f)% CPE
 z=1./(p(1)*(1i*2*pi*f).^p(2));
+end
+
+function z = W(p, freq) 
+    % WARBUG_IMPEDANCE function W (for finite linear diffusion)
+    % this function must be calledin the strings as W2 since it has 2
+    % paramaters
+    % Computes the Warburg impedance
+    % Inputs:
+    % p is an array of elements
+    %   p(1) = A - Warburg coefficient
+    %   p(2) = B (diffusion related parameter)
+    %   freq  - Frequency (Hz), can be an array
+    % Output:
+    %   z   - Complex Warburg impedance
+    % 1j is the imaginary unit, defined safely in case Matlab made a
+    % variable name j somewhere!
+    A = p(1);
+    B = p(2);
+    omega = 2 * pi * freq;  % Convert frequency to angular frequency
+    %fprintf("numel(A) = %d, numel(B) = %d, numel(p) = %d, numel(omega) = %d", numel(A), numel(B), numel(p), numel(omega))
+    z = A*tanh(B*sqrt(1j*omega))./sqrt(1j*omega); % Compute Warburg impedance
+    %fprintf("numel(z) = %d \n", numel(z))
+
+end
+
+function z = X(p, freq) 
+    % WARBUG_IMPEDANCE function X (for finite SPHERICAL diffusion)
+    % this function must be calledin the strings as X2 since it has 2
+    % paramaters
+    % Computes the Warburg impedance
+    % Inputs:
+    % p is an array of elements
+    %   p(1) = A - Warburg coefficient
+    %   p(2) = B (diffusion related parameter)
+    %   freq  - Frequency (Hz), can be an array
+    % Output:
+    %   z   - Complex Warburg impedance
+    % 1j is the imaginary unit, defined safely in case Matlab made a
+    % variable name j somewhere!
+    A = p(1);
+    B = p(2);
+    omega = 2 * pi * freq;  % Convert frequency to angular frequency
+    C = B*sqrt(1j*omega); % dummy variable C
+
+    %z = A./(1-C.*coth(C)); % Jacobsen uses a negative sign convention in
+    % equation A15
+
+    z = A./(C.*coth(C)-1); % from Journal of The Electrochemical Society, 147 (8) 2930-2940 (2000)
+
 end
 % sub functions for the operators parallel and series
 function z=s(varargin) % more zs in series
